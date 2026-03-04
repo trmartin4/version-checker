@@ -90,19 +90,46 @@ let first_breaking = calculate_first_compatible_server_version(
 
 ## Example Output
 
+### Check compatibility between server and client
+
+```
+Bitwarden Version Compatibility Checker
+
+Server version: 2024.11.0
+Client version: 2024.10.0
+
+Compatible: true
+```
+
+### Show compatibility window for a server version
+
 ```
 Bitwarden Version Compatibility Checker
 
 Server version: 2024.11.0
 
-Client compatibility checks:
-  2024.11.0 compatible: true
-  2024.9.0 compatible: true
-  2024.8.0 compatible: false
-  2024.7.0 compatible: false (outside 2-version window)
+Must be compatible with client version range:
+  2024.9.x through 2024.13.x
+```
 
---- Breaking Change Calculation ---
-Last incompatible client version: 2024.8.0
-Corresponding server version: 2024.8.0
-First server version where breaking change can be introduced: 2024.11.0
+### Show compatibility window for a client version
+
+```
+Bitwarden Version Compatibility Checker
+
+Client version: 2024.10.0
+
+Must be compatible with server version range:
+  2024.8.x through 2024.12.x
+```
+
+### No arguments (shows examples)
+
+```
+Bitwarden Version Compatibility Checker
+
+No versions specified. Run with --help for usage.
+
+Example usage:
+  version-checker --server 2024.11.0 --client 2024.10.0
 ```
