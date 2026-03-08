@@ -1,8 +1,17 @@
 use clap::Parser;
 use semver::Version;
 
+/// Converts a Bitwarden version to a linear month index so that cross-year
+/// boundaries are handled correctly (e.g. 2025.12 → 2026.1 is a difference of 1).
 fn bitwarden_major(v: &Version) -> u64 {
-    v.minor
+    v.major * 12 + v.minor
+}
+
+/// Converts a linear month index back to (year, month).
+fn from_linear(idx: u64) -> (u64, u64) {
+    let year = (idx - 1) / 12;
+    let month = ((idx - 1) % 12) + 1;
+    (year, month)
 }
 
 fn is_server_compatible_with_client(server: &Version, client: &Version) -> bool {
@@ -26,13 +35,9 @@ fn calculate_first_compatible_server_version(
     _last_incompatible_client_version: &Version,
     corresponding_server_version: &Version,
 ) -> Version {
-    let new_minor = bitwarden_major(corresponding_server_version) + 3;
-
-    Version::new(
-        corresponding_server_version.major,
-        new_minor,
-        corresponding_server_version.patch,
-    )
+    let linear = bitwarden_major(corresponding_server_version) + 3;
+    let (year, month) = from_linear(linear);
+    Version::new(year, month, corresponding_server_version.patch)
 }
 
 #[derive(Parser, Debug)]
@@ -50,8 +55,10 @@ struct Cli {
 
 fn print_support_window(version: &Version, version_type: &str) {
     let major = bitwarden_major(version);
-    let min_compatible = if major >= 2 { major - 2 } else { 0 };
-    let max_compatible = major + 2;
+    let min_linear = major.saturating_sub(2).max(1);
+    let max_linear = major + 2;
+    let (min_year, min_month) = from_linear(min_linear);
+    let (max_year, max_month) = from_linear(max_linear);
 
     let opposite_type = if version_type == "Server" {
         "client"
@@ -63,7 +70,7 @@ fn print_support_window(version: &Version, version_type: &str) {
     println!("\nMust be compatible with {} version range:", opposite_type);
     println!(
         "  {}.{}.x through {}.{}.x",
-        version.major, min_compatible, version.major, max_compatible
+        min_year, min_month, max_year, max_month
     );
 }
 
@@ -213,7 +220,7 @@ mod tests {
     #[test]
     fn test_bitwarden_major() {
         let v = Version::new(2024, 11, 0);
-        assert_eq!(bitwarden_major(&v), 11);
+        assert_eq!(bitwarden_major(&v), 2024 * 12 + 11);
     }
 
     #[test]
@@ -243,7 +250,7 @@ mod tests {
         ));
         assert!(is_server_compatible_with_client(
             &server,
-            &"2024.13.0".parse().unwrap()
+            &"2025.1.0".parse().unwrap()
         ));
 
         // Outside window - not compatible
@@ -253,7 +260,28 @@ mod tests {
         ));
         assert!(!is_server_compatible_with_client(
             &server,
-            &"2024.14.0".parse().unwrap()
+            &"2025.2.0".parse().unwrap()
+        ));
+    }
+
+    #[test]
+    fn test_cross_year_compatibility() {
+        let client: Version = "2025.12.0".parse().unwrap();
+
+        // Within window across year boundary
+        assert!(is_server_compatible_with_client(
+            &"2026.1.0".parse().unwrap(),
+            &client
+        ));
+        assert!(is_server_compatible_with_client(
+            &"2026.2.0".parse().unwrap(),
+            &client
+        ));
+
+        // Outside window
+        assert!(!is_server_compatible_with_client(
+            &"2026.3.0".parse().unwrap(),
+            &client
         ));
     }
 
